@@ -158,31 +158,12 @@ openspec/specs/      especificaciones vigentes
 openspec/changes/    cambios de OpenSpec, incluidos los archivados
 public/              archivos estáticos
 ```
-## Ejecución local
+## Equipo
 
-Resumen de los pasos para tener la app corriendo en local. Cada paso se explica en detalle en las secciones siguientes.
+Proyecto desarrollado para la materia Tendencias avanzadas en ingeniería de software asistida por IA, Universidad El Bosque.
 
-**macOS / Linux (bash o zsh):**
+- <Sebastián Martínez Velandia>
+- <David Orlando González Buitrago>
+- <Kavin Santiago García>
+- <Juan Diego Castro>
 
-```bash
-npm install
-cp .env.example .env
-npx prisma migrate deploy
-DATABASE_URL="file:./dev.db" ADMIN_EMAIL="<correo>" ADMIN_PASSWORD="<contraseña>" npm run admin:init
-npm run dev
-```
-
-**Windows (PowerShell):**
-
-```powershell
-npm install
-Copy-Item .env.example .env
-npx prisma migrate deploy
-$env:DATABASE_URL = "file:./dev.db"
-$env:ADMIN_EMAIL = "<correo>"
-$env:ADMIN_PASSWORD = "<contraseña>"
-npm run admin:init
-npm run dev
-```
-
-Después abre [http://localhost:3000](http://localhost:3000).
