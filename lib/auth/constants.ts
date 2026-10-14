@@ -1,0 +1,9 @@
+export const SESSION_COOKIE = "bookingapp_session";
+export const SESSION_HOURS = 12;
+export const SESSION_MS = SESSION_HOURS * 60 * 60 * 1000;
+export const MIN_PASSWORD_LENGTH = 8;
+export const ROLE_ESTUDIANTE = "ESTUDIANTE";
+export const ROLE_PROFESOR = "PROFESOR";
+export const ROLE_ADMINISTRADOR = "ADMINISTRADOR";
+export const ASSIGNABLE_ROLES = [ROLE_ESTUDIANTE, ROLE_PROFESOR] as const;
+export const BOGOTA_TIME_ZONE = "America/Bogota";
