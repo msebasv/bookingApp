@@ -214,7 +214,21 @@ async function book(page: Page, codigo: string, fecha: string, hora: string) {
   const form = page.locator("#crear-reserva");
   await form.locator("select[name='salaId']").selectOption({ label: codigo });
   await form.locator("input[name='fecha']").fill(fecha);
-  await form.locator("input[name='hora']").fill(hora);
+  const horaSelect = form.locator("select[name='hora']");
+  try {
+    await horaSelect.selectOption(hora, { timeout: 2000 });
+  } catch {
+    await horaSelect.evaluate((node, value) => {
+      const select = node as HTMLSelectElement;
+      if (![...select.options].some((option) => option.value === value)) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        select.appendChild(option);
+      }
+      select.value = value;
+    }, hora);
+  }
   await form.locator("input[name='duracion']").fill("");
   await form.getByRole("button", { name: "Confirmar reserva" }).click();
 }
@@ -428,7 +442,7 @@ test("confirma 60 minutos, rechaza otra duración o una sala inactiva y no edita
   const form = page.locator("#crear-reserva");
   await form.locator("select[name='salaId']").selectOption({ label: codigo });
   await form.locator("input[name='fecha']").fill(slot.fecha);
-  await form.locator("input[name='hora']").fill("11:00");
+  await form.locator("select[name='hora']").selectOption("11:00");
   await form.locator("input[name='duracion']").fill("");
   await form.evaluate((node, id) => {
     const input = document.createElement("input");
@@ -480,6 +494,7 @@ test("cancela la propia, rechaza la ajena y el administrador cancela sin volver 
   const cancelRequest = page.waitForRequest((request) => request.method() === "POST" && request.url().includes("/reservas"));
   await firstArticle.getByRole("button", { name: "Cancelar reserva" }).click();
   const cancelSource = await cancelRequest;
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(firstArticle.getByText("CANCELADA", { exact: true })).toBeVisible();
   const cancelled = (await reservationsFor(codigo))[0];
   expect(cancelled.estado).toBe("CANCELADA");
@@ -518,6 +533,7 @@ test("cancela la propia, rechaza la ajena y el administrador cancela sin volver 
   await page.goto("/reservas");
   const adminArticle = page.getByRole("article", { name: `Reserva ${second.id}` });
   await adminArticle.getByRole("button", { name: "Cancelar reserva" }).click();
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(adminArticle.getByText("CANCELADA", { exact: true })).toBeVisible();
   const adminCancelled = await prisma.reserva.findUniqueOrThrow({
     where: { id: second.id },
@@ -585,6 +601,7 @@ test("cancelar y crear otra en el mismo intervalo deja dos registros distintos",
   await bookAndConfirm(page, codigo, slot.fecha, "08:00");
   const original = (await reservationsFor(codigo))[0];
   await page.getByRole("article", { name: `Reserva ${original.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(page.getByRole("article", { name: `Reserva ${original.id}` }).getByText("CANCELADA", { exact: true })).toBeVisible();
 
   await bookAndConfirm(page, codigo, slot.fecha, "08:00");
@@ -902,6 +919,7 @@ test("una reserva vigente impide desactivar y el historial se conserva", async (
   await bookAndConfirm(page, cancelled, slot.fecha, "08:00");
   const cancelledRow = (await reservationsFor(cancelled))[0];
   await page.getByRole("article", { name: `Reserva ${cancelledRow.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(page.getByRole("article", { name: `Reserva ${cancelledRow.id}` }).getByText("CANCELADA", { exact: true })).toBeVisible();
 
   await page.goto("/salas");
@@ -967,6 +985,7 @@ test("un estudiante que afirma ser administrador no cambia horarios, no cancela 
   const cancelPromise = page.waitForRequest((request) => request.method() === "POST" && request.url().includes("/reservas"));
   await page.getByRole("article", { name: `Reserva ${sacrificed.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
   const cancelSource = await cancelPromise;
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(page.getByRole("article", { name: `Reserva ${sacrificed.id}` }).getByText("CANCELADA", { exact: true })).toBeVisible();
 
   const scheduleBody = claimAdministrator(
@@ -1154,4 +1173,119 @@ test("las claves foráneas rechazan borrar un padre con hijos e insertar un hijo
   expect(await prisma.horarioSala.count({ where: { salaId: "sala-inexistente" } })).toBe(0);
   expect(await prisma.reserva.count({ where: { salaId: "sala-inexistente" } })).toBe(0);
   expect(await prisma.reservaOcupacion.count({ where: { reservaId: "reserva-inexistente" } })).toBe(0);
+});
+
+test("el horario, la agenda y los filtros no revelan reservas ajenas", async ({ page }) => {
+  const slot = upcomingMorning();
+  const saturday = upcomingWeekday(6);
+  const codigo = uniqueCode("U");
+  const student = uniqueEmail("consulta-est");
+  const professor = uniqueEmail("consulta-pro");
+  await register(page, student);
+  await register(page, professor);
+  await prisma.usuario.update({ where: { email: professor }, data: { rol: "PROFESOR" } });
+
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto("/salas");
+  await createRoom(page, codigo);
+  await openDay(page, codigo, slot.label);
+  await page.goto("/reservas");
+  await bookAndConfirm(page, codigo, slot.fecha, "08:00");
+  const occupied = (await reservationsFor(codigo))[0];
+  const past = await seedReservation(
+    codigo,
+    new Date(Date.now() - 3 * 60 * 60 * 1000),
+    new Date(Date.now() - 2 * 60 * 60 * 1000),
+    "CONFIRMADA",
+  );
+  const cancelled = await seedReservation(
+    codigo,
+    new Date(Date.now() + 5 * 60 * 60 * 1000),
+    new Date(Date.now() + 6 * 60 * 60 * 1000),
+    "CANCELADA",
+  );
+
+  await loginAs(page, student, PASSWORD);
+  await page.goto("/reservas");
+  const form = page.locator("#crear-reserva");
+  await form.locator("select[name='salaId']").selectOption({ label: codigo });
+  const schedule = form.getByRole("region", { name: "Horario de la sala" });
+  await expect(schedule.getByText("08:00–18:00")).toBeVisible();
+  await expect(schedule.getByText("Sin horario").first()).toBeVisible();
+  await expect(schedule.getByText("Sábado y domingo no se pueden reservar.")).toBeVisible();
+  await form.locator("input[name='fecha']").fill(slot.fecha);
+  await expect(form.locator("select[name='hora'] option[value='08:00']")).toBeAttached();
+  await expect(form.locator("select[name='hora'] option[value='17:00']")).toBeAttached();
+  await expect(form.locator("select[name='hora'] option[value='17:30']")).toHaveCount(0);
+  await form.locator("input[name='fecha']").fill(saturday.fecha);
+  await expect(form.getByText("Solo se puede reservar de lunes a viernes.")).toBeVisible();
+  await expect(form.locator("select[name='hora'] option[value='08:00']")).toHaveCount(0);
+
+  await page.goto(`/reservas?agendaSala=${occupied.salaId}&agendaFecha=${slot.fecha}`);
+  const agenda = page.getByRole("form", { name: "Disponibilidad" });
+  await expect(agenda.locator("li").filter({ hasText: "08:00–08:30" })).toContainText("Ocupada");
+  await expect(agenda.locator("li").filter({ hasText: "09:00–09:30" })).toContainText("Libre");
+  await expect(agenda.getByText(ADMIN_EMAIL)).toHaveCount(0);
+  await expect(agenda.getByText(occupied.id)).toHaveCount(0);
+  await page.goto(`/reservas?agendaSala=${occupied.salaId}&agendaFecha=${saturday.fecha}`);
+  await expect(page.getByRole("form", { name: "Disponibilidad" }).getByText("Solo se puede reservar de lunes a viernes.")).toBeVisible();
+  await expect(page.getByRole("form", { name: "Disponibilidad" }).locator("li")).toHaveCount(0);
+  const closed = [1, 2, 3, 4, 5]
+    .map((day) => upcomingWeekday(day))
+    .find((candidate) => candidate.fecha !== slot.fecha);
+  if (!closed) {
+    throw new Error("Falta un día laborable sin horario.");
+  }
+  await page.goto(`/reservas?agendaSala=${occupied.salaId}&agendaFecha=${closed.fecha}`);
+  await expect(page.getByRole("form", { name: "Disponibilidad" }).getByText("Sin horario")).toBeVisible();
+  await expect(page.getByRole("form", { name: "Disponibilidad" }).locator("li")).toHaveCount(0);
+  await expect(page.getByText(occupied.id)).toHaveCount(0);
+
+  await expect(page.getByRole("article", { name: `Reserva ${occupied.id}` })).toHaveCount(0);
+  await page.getByRole("link", { name: "Pasadas", exact: true }).click();
+  await expect(page.getByRole("article", { name: `Reserva ${past.id}` })).toHaveCount(0);
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
+  await expect(page.getByRole("article", { name: `Reserva ${cancelled.id}` })).toHaveCount(0);
+  await expect(page.getByText(ADMIN_EMAIL)).toHaveCount(0);
+
+  await loginAs(page, professor, PASSWORD);
+  await page.goto("/reservas");
+  await page.locator("#crear-reserva").locator("select[name='salaId']").selectOption({ label: codigo });
+  await expect(page.locator("#crear-reserva").getByRole("region", { name: "Horario de la sala" }).getByText("Sin horario").first()).toBeVisible();
+
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto("/reservas");
+  await expect(page.getByRole("article", { name: `Reserva ${occupied.id}` })).toBeVisible();
+  await page.getByRole("link", { name: "Pasadas", exact: true }).click();
+  await expect(page.getByRole("article", { name: `Reserva ${past.id}` })).toBeVisible();
+  await expect(page.getByRole("article", { name: `Reserva ${occupied.id}` })).toHaveCount(0);
+  await page.getByRole("link", { name: "Canceladas", exact: true }).click();
+  await expect(page.getByRole("article", { name: `Reserva ${cancelled.id}` })).toBeVisible();
+  await expect(page.getByRole("article", { name: `Reserva ${past.id}` })).toHaveCount(0);
+});
+
+test("la portada describe el producto y el enlace de roles sigue al rol almacenado", async ({ page }) => {
+  const student = uniqueEmail("portada-est");
+  await register(page, student);
+
+  await page.context().clearCookies();
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/");
+  const main = page.getByRole("main");
+  await expect(main.getByText("Salas", { exact: true })).toBeVisible();
+  await expect(main.getByText("Horarios", { exact: true })).toBeVisible();
+  await expect(main.getByText("Reservas", { exact: true })).toBeVisible();
+  await expect(main.getByRole("link", { name: "Ingresar" })).toBeVisible();
+  await expect(main.getByRole("link", { name: "Crear cuenta" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Roles", exact: true })).toHaveCount(0);
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await expect(page.getByRole("link", { name: "Roles", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Roles", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/roles$/);
+
+  await loginAs(page, student, PASSWORD);
+  await page.goto("/?rol=ADMINISTRADOR");
+  await expect(page.getByRole("link", { name: "Roles", exact: true })).toHaveCount(0);
 });

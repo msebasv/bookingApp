@@ -2,16 +2,16 @@ import Link from "next/link";
 
 const points = [
   {
-    title: "Registro de estudiante",
-    text: "La cuenta pública se crea con correo y contraseña. El rol inicial es estudiante.",
+    title: "Salas",
+    text: "El catálogo muestra las salas activas. El administrador también consulta las inactivas y mantiene sus datos.",
   },
   {
-    title: "Sesión en el servidor",
-    text: "El ingreso abre una sesión de 12 horas. Cerrarla deja de autorizar la cuenta.",
+    title: "Horarios",
+    text: "Cada sala tiene su apertura y su cierre. La reserva se elige dentro de ese horario de lunes a viernes.",
   },
   {
-    title: "Roles en el servidor",
-    text: "Un administrador asigna profesor o estudiante. El registro público no crea administradores.",
+    title: "Reservas",
+    text: "Una reserva confirmada dura 60 minutos. La agenda muestra qué franjas están libres y cuáles ocupadas.",
   },
 ];
 
@@ -22,11 +22,11 @@ export default function Home() {
         <div className="flex flex-col gap-5">
           <p className="text-sm font-semibold tracking-wide text-blue">Plataforma universitaria</p>
           <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-navy sm:text-5xl">
-            Acceso claro para reservar salas de estudio
+            Reserva salas de estudio con el horario a la vista
           </h1>
           <p className="max-w-xl text-base leading-7 text-muted sm:text-lg">
-            BookingApp reúne el ingreso, el registro y la asignación de roles de estudiantes,
-            profesores y administradores.
+            BookingApp reúne las salas, sus horarios y las reservas de estudiantes, profesores y
+            administradores.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link

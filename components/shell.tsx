@@ -8,7 +8,7 @@ const links = [
   { href: "/cuenta", label: "Tu cuenta" },
 ];
 
-export function SiteHeader() {
+export function SiteHeader({ extra }: { extra?: React.ReactNode }) {
   return (
     <header className="border-b border-line bg-white">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -31,6 +31,7 @@ export function SiteHeader() {
               {link.label}
             </Link>
           ))}
+          {extra}
         </nav>
       </div>
     </header>

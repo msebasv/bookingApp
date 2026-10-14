@@ -2,12 +2,30 @@
 
 import { useState, type FormEvent } from "react";
 import { useActionState } from "react";
+import { minuteLabel, MSG_DAY_CLOSED, MSG_NO_COMPATIBLE_START, MSG_PICK_DATE, MSG_WEEKEND_NOTE, startOffer } from "@/lib/reservations/consultation";
 import { cancelReservation, createReservation } from "@/lib/reservations/actions";
 import { isRuleError, readBogotaClock } from "@/lib/reservations/time";
-import { MSG_INSTANT, MSG_ROOM_REQUIRED, parseBogotaDateTime, validateReservation } from "@/lib/reservations/validation";
+import {
+  MSG_INSTANT,
+  MSG_NO_HOURS,
+  MSG_ROOM_REQUIRED,
+  MSG_WEEKDAY_RANGE,
+  parseBogotaDateTime,
+  validateReservation,
+} from "@/lib/reservations/validation";
 
 const fieldClass =
   "h-11 w-full rounded-md border border-line bg-white px-3 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-blue focus:ring-2 focus:ring-blue/20";
+
+const WEEK_DAYS = [
+  { dia: 1, label: "Lunes" },
+  { dia: 2, label: "Martes" },
+  { dia: 3, label: "Miércoles" },
+  { dia: 4, label: "Jueves" },
+  { dia: 5, label: "Viernes" },
+  { dia: 6, label: "Sábado" },
+  { dia: 7, label: "Domingo" },
+] as const;
 
 function Alert({ error }: { error: string }) {
   if (!error) {
@@ -34,40 +52,61 @@ export function CreateReservationForm({
   rooms: { id: string; codigo: string; nombre: string }[];
   horarios: { salaId: string; dia: number; aperturaMinuto: number; cierreMinuto: number }[];
 }) {
+  const [salaId, setSalaId] = useState("");
+  const [fecha, setFecha] = useState("");
   const [localError, setLocalError] = useState("");
   const [state, formAction, pending] = useActionState(createReservation, null);
+  const roomHours = horarios.filter((horario) => horario.salaId === salaId);
+  const inicio = fecha ? parseBogotaDateTime(fecha, "00:00") : null;
+  const clock = inicio ? readBogotaClock(inicio) : null;
+  const weekday = clock && !isRuleError(clock) ? clock.data.weekday : null;
+  const saved = weekday === null ? null : roomHours.find((horario) => horario.dia === weekday) ?? null;
+  const offer = startOffer(
+    salaId && fecha ? weekday : null,
+    saved ? { aperturaMinuto: saved.aperturaMinuto, cierreMinuto: saved.cierreMinuto } : null,
+  );
+  const startHint =
+    offer.reason === "date"
+      ? MSG_PICK_DATE
+      : offer.reason === "weekend"
+        ? MSG_WEEKDAY_RANGE
+        : offer.reason === "closed"
+          ? MSG_NO_HOURS
+          : offer.reason === "short"
+            ? MSG_NO_COMPATIBLE_START
+            : "Elige una hora de inicio. La reserva dura 60 minutos.";
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     const form = new FormData(event.currentTarget);
     if (String(form.get("id") ?? "").trim() || String(form.get("reservaId") ?? "").trim()) {
       return;
     }
-    const salaId = String(form.get("salaId") ?? "");
-    if (!salaId) {
+    const selectedRoom = String(form.get("salaId") ?? "");
+    if (!selectedRoom) {
       event.preventDefault();
       setLocalError(MSG_ROOM_REQUIRED);
       return;
     }
-    const inicio = parseBogotaDateTime(String(form.get("fecha") ?? ""), String(form.get("hora") ?? ""));
-    if (!inicio) {
+    const start = parseBogotaDateTime(String(form.get("fecha") ?? ""), String(form.get("hora") ?? ""));
+    if (!start) {
       event.preventDefault();
       setLocalError(MSG_INSTANT);
       return;
     }
     const rawDuration = String(form.get("duracion") ?? "").trim();
     const duration = rawDuration === "" ? undefined : Number(rawDuration);
-    const clock = readBogotaClock(inicio);
-    if (isRuleError(clock)) {
+    const startClock = readBogotaClock(start);
+    if (isRuleError(startClock)) {
       event.preventDefault();
-      setLocalError(clock.error);
+      setLocalError(startClock.error);
       return;
     }
-    const saved = horarios.find((horario) => horario.salaId === salaId && horario.dia === clock.data.weekday);
+    const day = horarios.find((horario) => horario.salaId === selectedRoom && horario.dia === startClock.data.weekday);
     const checked = validateReservation({
-      inicio,
+      inicio: start,
       now: new Date(),
       duration,
-      schedule: saved ? { aperturaMinuto: saved.aperturaMinuto, cierreMinuto: saved.cierreMinuto } : null,
+      schedule: day ? { aperturaMinuto: day.aperturaMinuto, cierreMinuto: day.cierreMinuto } : null,
     });
     if ("error" in checked) {
       event.preventDefault();
@@ -86,7 +125,14 @@ export function CreateReservationForm({
         <label className="text-sm font-medium text-ink" htmlFor="reserva-sala">
           Sala
         </label>
-        <select id="reserva-sala" className={fieldClass} name="salaId" required defaultValue="">
+        <select
+          id="reserva-sala"
+          className={fieldClass}
+          name="salaId"
+          required
+          value={salaId}
+          onChange={(event) => setSalaId(event.target.value)}
+        >
           <option value="" disabled>
             Elige una sala
           </option>
@@ -97,20 +143,68 @@ export function CreateReservationForm({
           ))}
         </select>
       </div>
+      <section aria-label="Horario de la sala" className="rounded-md border border-line bg-white px-3 py-3">
+        {salaId ? (
+          <ul className="flex flex-col gap-1">
+            {WEEK_DAYS.map((day) => {
+              const hours = roomHours.find((horario) => horario.dia === day.dia);
+              return (
+                <li key={day.dia} className="flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-ink">{day.label}</span>
+                  <span className="text-muted">
+                    {hours ? `${minuteLabel(hours.aperturaMinuto)}–${minuteLabel(hours.cierreMinuto)}` : MSG_DAY_CLOSED}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted">Elige una sala para ver su horario.</p>
+        )}
+        <p className="mt-2 text-xs leading-5 text-muted">{MSG_WEEKEND_NOTE}</p>
+      </section>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-ink" htmlFor="reserva-fecha">
             Fecha
           </label>
-          <input id="reserva-fecha" className={fieldClass} name="fecha" type="date" required />
+          <input
+            id="reserva-fecha"
+            className={fieldClass}
+            name="fecha"
+            type="date"
+            required
+            value={fecha}
+            onChange={(event) => setFecha(event.target.value)}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-ink" htmlFor="reserva-hora">
             Hora
           </label>
-          <input id="reserva-hora" className={fieldClass} name="hora" type="time" required />
+          <select
+            id="reserva-hora"
+            key={`${salaId}-${fecha}`}
+            className={fieldClass}
+            name="hora"
+            required={offer.starts.length > 0}
+            defaultValue=""
+          >
+            <option value="" disabled>
+              Elige una hora
+            </option>
+            {offer.starts.map((minute) => {
+              const label = minuteLabel(minute);
+              return (
+                <option key={label} value={label}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
         </div>
       </div>
+      <p className="text-xs font-normal text-muted">{startHint}</p>
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-ink" htmlFor="reserva-duracion">
           Duración
