@@ -14,7 +14,7 @@ BookingApp es una aplicación web para consultar espacios de estudio de una univ
 
 ## Roles
 
-El rol se guarda en el servidor. El registro público siempre crea un estudiante e ignora un rol enviado por el cliente.
+Este rol se guarda en el servidor. El registro público siempre crea un estudiante e ignora un rol enviado por el cliente.
 
 | Rol | Qué puede hacer |
 | --- | --- |
