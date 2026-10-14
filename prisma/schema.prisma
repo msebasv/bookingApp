@@ -8,12 +8,13 @@ datasource db {
 }
 
 model Usuario {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
-  rol          String   @default("ESTUDIANTE")
-  creadoEn     DateTime @default(now())
+  rol          String    @default("ESTUDIANTE")
+  creadoEn     DateTime  @default(now())
   sesiones     Sesion[]
+  reservas     Reserva[]
 }
 
 model Sesion {
@@ -25,14 +26,53 @@ model Sesion {
 }
 
 model Sala {
-  id                String   @id @default(cuid())
+  id                String             @id @default(cuid())
   nombre            String
-  codigo            String   @unique
-  codigoNormalizado String   @unique
+  codigo            String             @unique
+  codigoNormalizado String             @unique
   ubicacion         String
   capacidad         Int
   descripcion       String?
-  estado            String   @default("ACTIVA")
-  creadoEn          DateTime @default(now())
-  actualizadoEn     DateTime @updatedAt
+  estado            String             @default("ACTIVA")
+  creadoEn          DateTime           @default(now())
+  actualizadoEn     DateTime           @updatedAt
+  horarios          HorarioSala[]
+  reservas          Reserva[]
+  ocupaciones       ReservaOcupacion[]
+}
+
+model HorarioSala {
+  id             String @id @default(cuid())
+  salaId         String
+  dia            Int
+  aperturaMinuto Int
+  cierreMinuto   Int
+  sala           Sala   @relation(fields: [salaId], references: [id], onDelete: Restrict)
+
+  @@unique([salaId, dia])
+}
+
+model Reserva {
+  id            String             @id @default(cuid())
+  salaId        String
+  usuarioId     String
+  inicio        DateTime
+  fin           DateTime
+  estado        String
+  creadoEn      DateTime           @default(now())
+  actualizadoEn DateTime           @updatedAt
+  sala          Sala               @relation(fields: [salaId], references: [id], onDelete: Restrict)
+  usuario       Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  ocupaciones   ReservaOcupacion[]
+}
+
+model ReservaOcupacion {
+  id        String   @id @default(cuid())
+  reservaId String
+  salaId    String
+  instante  DateTime
+  reserva   Reserva  @relation(fields: [reservaId], references: [id], onDelete: Restrict)
+  sala      Sala     @relation(fields: [salaId], references: [id], onDelete: Restrict)
+
+  @@unique([salaId, instante])
 }

@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { useActionState } from "react";
+import { saveRoomDaySchedule } from "@/lib/reservations/actions";
+import { readDaySchedule } from "@/lib/reservations/validation";
 import { createRoom, setRoomState, updateRoom, type RoomFormState } from "@/lib/rooms/actions";
 import {
   ROOM_ACTIVE,
@@ -207,6 +209,140 @@ export function EditRoomForm({
         Guardar cambios
       </button>
     </form>
+  );
+}
+
+const SCHEDULE_DAYS = [
+  { dia: 1, label: "Lunes" },
+  { dia: 2, label: "Martes" },
+  { dia: 3, label: "Miércoles" },
+  { dia: 4, label: "Jueves" },
+  { dia: 5, label: "Viernes" },
+  { dia: 6, label: "Sábado" },
+  { dia: 7, label: "Domingo" },
+] as const;
+
+function clockValue(minute: number) {
+  return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+}
+
+function DayScheduleForm({
+  salaId,
+  dia,
+  label,
+  aperturaMinuto,
+  cierreMinuto,
+}: {
+  salaId: string;
+  dia: number;
+  label: string;
+  aperturaMinuto?: number;
+  cierreMinuto?: number;
+}) {
+  const [localError, setLocalError] = useState("");
+  const [state, formAction, pending] = useActionState(saveRoomDaySchedule, null);
+  const openId = `horario-${salaId}-${dia}-apertura`;
+  const closeId = `horario-${salaId}-${dia}-cierre`;
+
+  function onSubmit(event: FormEvent<HTMLFormElement>) {
+    const form = new FormData(event.currentTarget);
+    const checked = readDaySchedule({
+      dia: String(form.get("dia") ?? ""),
+      apertura: String(form.get("apertura") ?? ""),
+      cierre: String(form.get("cierre") ?? ""),
+    });
+    if ("error" in checked) {
+      event.preventDefault();
+      setLocalError(checked.error);
+      return;
+    }
+    setLocalError("");
+  }
+
+  const error = localError || state?.error || "";
+  const notice = localError ? "" : state?.notice || "";
+
+  return (
+    <form
+      id={`horario-${salaId}-${dia}`}
+      action={formAction}
+      onSubmit={onSubmit}
+      aria-label={`Horario del ${label}`}
+      className="flex flex-col gap-3 rounded-md border border-line p-3"
+    >
+      <p className="text-sm font-semibold text-ink">{label}</p>
+      <input type="hidden" name="salaId" value={salaId} />
+      <input type="hidden" name="dia" value={dia} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-ink" htmlFor={openId}>
+            Apertura
+          </label>
+          <input
+            id={openId}
+            className={fieldClass}
+            name="apertura"
+            type="time"
+            defaultValue={aperturaMinuto === undefined ? "" : clockValue(aperturaMinuto)}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-ink" htmlFor={closeId}>
+            Cierre
+          </label>
+          <input
+            id={closeId}
+            className={fieldClass}
+            name="cierre"
+            type="time"
+            defaultValue={cierreMinuto === undefined ? "" : clockValue(cierreMinuto)}
+          />
+        </div>
+      </div>
+      <Alert error={error} />
+      <Notice notice={notice} />
+      <button
+        className="inline-flex h-11 items-center justify-center rounded-md bg-navy px-4 text-sm font-semibold text-white transition-colors hover:bg-blue disabled:cursor-not-allowed disabled:opacity-60"
+        type="submit"
+        disabled={pending}
+      >
+        Guardar horario
+      </button>
+    </form>
+  );
+}
+
+export function RoomScheduleForm({
+  salaId,
+  horarios,
+}: {
+  salaId: string;
+  horarios: { dia: number; aperturaMinuto: number; cierreMinuto: number }[];
+}) {
+  return (
+    <section aria-label="Horario" className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-semibold text-navy">Horario</h3>
+        <p className="text-xs leading-5 text-muted">
+          La apertura y el cierre pertenecen al mismo día. Déjalos vacíos para dejar ese día cerrado.
+        </p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {SCHEDULE_DAYS.map((day) => {
+          const saved = horarios.find((horario) => horario.dia === day.dia);
+          return (
+            <DayScheduleForm
+              key={day.dia}
+              salaId={salaId}
+              dia={day.dia}
+              label={day.label}
+              aperturaMinuto={saved?.aperturaMinuto}
+              cierreMinuto={saved?.cierreMinuto}
+            />
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

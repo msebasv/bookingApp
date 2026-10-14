@@ -2,7 +2,8 @@ import { execFileSync } from "node:child_process";
 import { expect, test, type BrowserContext, type Page, type Request } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 
-process.env.DATABASE_URL = "file:./e2e.db";
+const databaseUrl = process.env.BOOKINGAPP_E2E_DATABASE_URL ?? "file:./e2e.db";
+process.env.DATABASE_URL = databaseUrl;
 
 const prisma = new PrismaClient();
 const COOKIE = "bookingapp_session";
@@ -208,7 +209,7 @@ test("el script crea un solo administrador", async () => {
     encoding: "utf8",
     env: {
       ...process.env,
-      DATABASE_URL: "file:./e2e.db",
+      DATABASE_URL: databaseUrl,
       ADMIN_EMAIL,
       ADMIN_PASSWORD,
     },
@@ -220,7 +221,7 @@ test("el script crea un solo administrador", async () => {
     encoding: "utf8",
     env: {
       ...process.env,
-      DATABASE_URL: "file:./e2e.db",
+      DATABASE_URL: databaseUrl,
       ADMIN_EMAIL: "otro-admin@bookingapp.test",
       ADMIN_PASSWORD,
     },

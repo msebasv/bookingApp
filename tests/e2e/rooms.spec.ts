@@ -2,7 +2,8 @@ import { execFileSync } from "node:child_process";
 import { expect, test, type BrowserContext, type Locator, type Page, type Request } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 
-process.env.DATABASE_URL = "file:./e2e.db";
+const databaseUrl = process.env.BOOKINGAPP_E2E_DATABASE_URL ?? "file:./e2e.db";
+process.env.DATABASE_URL = databaseUrl;
 
 const prisma = new PrismaClient();
 const PASSWORD = "secreto12";
@@ -16,7 +17,7 @@ test.beforeAll(() => {
     encoding: "utf8",
     env: {
       ...process.env,
-      DATABASE_URL: "file:./e2e.db",
+      DATABASE_URL: databaseUrl,
       ADMIN_EMAIL,
       ADMIN_PASSWORD,
     },
@@ -100,6 +101,9 @@ async function replayAction(context: BrowserContext, source: Request, body?: Buf
 }
 
 test("sin sesión /salas redirige al ingreso y el catálogo vacío no inventa salas", async ({ page }) => {
+  await prisma.reservaOcupacion.deleteMany();
+  await prisma.reserva.deleteMany();
+  await prisma.horarioSala.deleteMany();
   await prisma.sala.deleteMany();
   await page.goto("/salas");
   await expect(page).toHaveURL(/\/ingreso$/);

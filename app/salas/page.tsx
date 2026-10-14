@@ -1,8 +1,9 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { CreateRoomForm, EditRoomForm, RoomStateForm } from "@/components/room-forms";
+import { CreateRoomForm, EditRoomForm, RoomScheduleForm, RoomStateForm } from "@/components/room-forms";
 import { Panel } from "@/components/shell";
 import { ROLE_ADMINISTRADOR } from "@/lib/auth/constants";
+import { listSchedulesForRooms } from "@/lib/reservations/queries";
 import { listRoomsForSession } from "@/lib/rooms/queries";
 import { MSG_EMPTY, ROOM_ACTIVE } from "@/lib/rooms/validation";
 
@@ -14,6 +15,7 @@ async function RoomCatalog() {
 
   const { usuario, rooms } = result;
   const isAdmin = usuario.rol === ROLE_ADMINISTRADOR;
+  const schedules = isAdmin ? await listSchedulesForRooms(rooms.map((room) => room.id)) : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -43,9 +45,15 @@ async function RoomCatalog() {
                   <p className="text-sm text-ink">Capacidad: {room.capacidad}</p>
                   {room.descripcion ? <p className="text-sm leading-6 text-muted">{room.descripcion}</p> : null}
                   {isAdmin ? (
-                    <div className="grid gap-6 border-t border-line pt-4 lg:grid-cols-[1fr_auto]">
-                      <EditRoomForm room={room} />
-                      <RoomStateForm id={room.id} estado={room.estado} />
+                    <div className="flex flex-col gap-6 border-t border-line pt-4">
+                      <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+                        <EditRoomForm room={room} />
+                        <RoomStateForm id={room.id} estado={room.estado} />
+                      </div>
+                      <RoomScheduleForm
+                        salaId={room.id}
+                        horarios={schedules.filter((horario) => horario.salaId === room.id)}
+                      />
                     </div>
                   ) : null}
                 </div>

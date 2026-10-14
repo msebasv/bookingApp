@@ -21,6 +21,7 @@ export const MSG_CREATED = "Sala creada.";
 export const MSG_UPDATED = "Sala actualizada.";
 export const MSG_ACTIVATED = "Sala activada.";
 export const MSG_DEACTIVATED = "Sala desactivada.";
+export const MSG_DEACTIVATION_BLOCKED = "No se puede desactivar la sala mientras tenga una reserva que no ha terminado.";
 export const MSG_EMPTY = "No hay salas registradas.";
 export const MSG_NOT_FOUND = "No se encontró la sala.";
 export const MSG_STATE = "El estado no es válido.";

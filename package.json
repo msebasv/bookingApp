@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "admin:init": "node scripts/init-admin.js",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:unit": "node --experimental-strip-types --test tests/unit/reservations.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

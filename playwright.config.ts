@@ -1,7 +1,7 @@
 
 import { defineConfig, devices } from "@playwright/test";
 
-const databaseUrl = "file:./e2e.db";
+const databaseUrl = process.env.BOOKINGAPP_E2E_DATABASE_URL ?? "file:./e2e.db";
 const port = 3100;
 const baseURL = `http://127.0.0.1:${port}`;
 

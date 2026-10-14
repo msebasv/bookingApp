@@ -4,6 +4,7 @@ const links = [
   { href: "/ingreso", label: "Ingresar" },
   { href: "/registro", label: "Crear cuenta" },
   { href: "/salas", label: "Salas" },
+  { href: "/reservas", label: "Reservas" },
   { href: "/cuenta", label: "Tu cuenta" },
 ];
 
