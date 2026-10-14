@@ -3,6 +3,7 @@ import Link from "next/link";
 const links = [
   { href: "/ingreso", label: "Ingresar" },
   { href: "/registro", label: "Crear cuenta" },
+  { href: "/salas", label: "Salas" },
   { href: "/cuenta", label: "Tu cuenta" },
 ];
 

@@ -23,3 +23,16 @@ model Sesion {
   expiraEn  DateTime
   creadoEn  DateTime @default(now())
 }
+
+model Sala {
+  id                String   @id @default(cuid())
+  nombre            String
+  codigo            String   @unique
+  codigoNormalizado String   @unique
+  ubicacion         String
+  capacidad         Int
+  descripcion       String?
+  estado            String   @default("ACTIVA")
+  creadoEn          DateTime @default(now())
+  actualizadoEn     DateTime @updatedAt
+}
