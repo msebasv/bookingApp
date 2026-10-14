@@ -38,6 +38,7 @@ El administrador no se crea desde el registro público. Solo puede crearse con `
 - Node.js 22.6 o posterior, porque `npm run test:unit` usa `--experimental-strip-types`
 - npm
 
+
 ## Instalación y variables de entorno
 
 En la raíz del repositorio:
@@ -157,3 +158,31 @@ openspec/specs/      especificaciones vigentes
 openspec/changes/    cambios de OpenSpec, incluidos los archivados
 public/              archivos estáticos
 ```
+## Ejecución local
+
+Resumen de los pasos para tener la app corriendo en local. Cada paso se explica en detalle en las secciones siguientes.
+
+**macOS / Linux (bash o zsh):**
+
+```bash
+npm install
+cp .env.example .env
+npx prisma migrate deploy
+DATABASE_URL="file:./dev.db" ADMIN_EMAIL="<correo>" ADMIN_PASSWORD="<contraseña>" npm run admin:init
+npm run dev
+```
+
+**Windows (PowerShell):**
+
+```powershell
+npm install
+Copy-Item .env.example .env
+npx prisma migrate deploy
+$env:DATABASE_URL = "file:./dev.db"
+$env:ADMIN_EMAIL = "<correo>"
+$env:ADMIN_PASSWORD = "<contraseña>"
+npm run admin:init
+npm run dev
+```
+
+Después abre [http://localhost:3000](http://localhost:3000).
