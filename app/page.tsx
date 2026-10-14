@@ -1,50 +1,58 @@
+import { Suspense } from "react";
 import Link from "next/link";
+import { ROLE_ADMINISTRADOR } from "@/lib/auth/constants";
+import { getSessionUser } from "@/lib/auth/session";
 
 const points = [
   {
     title: "Salas",
-    text: "El catálogo muestra las salas activas. El administrador también consulta las inactivas y mantiene sus datos.",
+    text: "Consulta los espacios de estudio activos, con su ubicación y su capacidad.",
   },
   {
     title: "Horarios",
-    text: "Cada sala tiene su apertura y su cierre. La reserva se elige dentro de ese horario de lunes a viernes.",
+    text: "Cada sala muestra su apertura y su cierre antes de elegir una hora.",
   },
   {
     title: "Reservas",
-    text: "Una reserva confirmada dura 60 minutos. La agenda muestra qué franjas están libres y cuáles ocupadas.",
+    text: "Reserva una franja libre. La confirmación dura 60 minutos.",
   },
 ];
 
-export default function Home() {
+function EntryLink({ href, label, primary }: { href: string; label: string; primary?: boolean }) {
   return (
-    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-10 sm:px-6 sm:py-16">
-      <section className="grid items-center gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+    <Link
+      href={href}
+      className={
+        primary
+          ? "inline-flex h-11 items-center justify-center rounded-md bg-navy px-5 text-sm font-semibold text-white transition-colors hover:bg-blue"
+          : "inline-flex h-11 items-center justify-center rounded-md border border-line bg-white px-5 text-sm font-semibold text-navy transition-colors hover:bg-blue-soft"
+      }
+    >
+      {label}
+    </Link>
+  );
+}
+
+function VisitorHome() {
+  return (
+    <>
+      <section className="grid items-center gap-8 lg:grid-cols-[1.15fr_0.85fr]">
         <div className="flex flex-col gap-5">
-          <p className="text-sm font-semibold tracking-wide text-blue">Plataforma universitaria</p>
+          <p className="text-sm font-semibold tracking-wide text-accent">Plataforma universitaria</p>
           <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-navy sm:text-5xl">
-            Reserva salas de estudio con el horario a la vista
+            Consulta espacios de estudio y resérvalos
           </h1>
           <p className="max-w-xl text-base leading-7 text-muted sm:text-lg">
-            BookingApp reúne las salas, sus horarios y las reservas de estudiantes, profesores y
-            administradores.
+            BookingApp permite ver las salas disponibles, su horario y reservar una franja cuando hay
+            lugar.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Link
-              href="/ingreso"
-              className="inline-flex h-11 items-center justify-center rounded-md bg-navy px-5 text-sm font-semibold text-white transition-colors hover:bg-blue"
-            >
-              Ingresar
-            </Link>
-            <Link
-              href="/registro"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-line bg-white px-5 text-sm font-semibold text-navy transition-colors hover:bg-blue-soft"
-            >
-              Crear cuenta
-            </Link>
+            <EntryLink href="/ingreso" label="Ingresar" primary />
+            <EntryLink href="/registro" label="Crear cuenta" />
           </div>
         </div>
-        <div className="rounded-lg border border-line bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold text-navy">Qué puedes hacer ahora</p>
+        <div className="rounded-xl border border-line bg-white p-6 shadow-sm">
+          <p className="text-sm font-semibold text-navy">Qué puedes hacer</p>
           <ul className="mt-4 flex flex-col gap-4">
             {points.map((point) => (
               <li key={point.title} className="border-t border-line pt-4 first:border-t-0 first:pt-0">
@@ -55,6 +63,53 @@ export default function Home() {
           </ul>
         </div>
       </section>
+    </>
+  );
+}
+
+function Shortcut({ href, title, text }: { href: string; title: string; text: string }) {
+  return (
+    <Link href={href} className="rounded-xl border border-line bg-white p-5 shadow-sm transition-colors hover:border-blue">
+      <p className="text-base font-semibold text-navy">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-muted">{text}</p>
+    </Link>
+  );
+}
+
+async function HomeForSession() {
+  const usuario = await getSessionUser();
+  if (!usuario) {
+    return <VisitorHome />;
+  }
+
+  const isAdmin = usuario.rol === ROLE_ADMINISTRADOR;
+  return (
+    <section className="flex flex-col gap-6">
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold tracking-wide text-blue">Sesión de {usuario.rol.toLowerCase()}</p>
+        <h1 className="max-w-xl text-4xl font-semibold tracking-tight text-navy sm:text-5xl">
+          Continúa con tus espacios de estudio
+        </h1>
+        <p className="max-w-xl text-base leading-7 text-muted">
+          Estos son los accesos de tu rol. El correo de la sesión está en el encabezado.
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Shortcut href="/salas" title="Salas" text="Consulta el catálogo que tu rol puede ver." />
+        <Shortcut href="/reservas" title="Reservas" text="Revisa la agenda y tus reservas confirmadas." />
+        {isAdmin ? <Shortcut href="/admin/roles" title="Roles" text="Asigna estudiante o profesor a otra cuenta." /> : null}
+        <Shortcut href="/cuenta" title="Mi cuenta" text="Consulta el rol de esta sesión y ciérrala." />
+      </div>
+    </section>
+  );
+}
+
+export default function Home() {
+  return (
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-10 sm:px-6 sm:py-16">
+      <Suspense fallback={<p className="text-sm text-muted">Cargando inicio…</p>}>
+        <HomeForSession />
+      </Suspense>
     </main>
   );
 }

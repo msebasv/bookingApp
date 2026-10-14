@@ -107,7 +107,8 @@ test("sin sesión /salas redirige al ingreso y el catálogo vacío no inventa sa
   await prisma.sala.deleteMany();
   await page.goto("/salas");
   await expect(page).toHaveURL(/\/ingreso$/);
-  await expect(page.getByRole("link", { name: "Salas", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Salas", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Ingresar", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Crear sala" })).toHaveCount(0);
 
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);

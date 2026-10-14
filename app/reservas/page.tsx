@@ -145,7 +145,11 @@ async function ReservationBoard({
                   <span className="text-ink">
                     {minuteLabel(band.startMinute)}–{minuteLabel(band.startMinute + 30)}
                   </span>
-                  <span className="font-semibold text-navy">{band.state === "ocupada" ? "Ocupada" : "Libre"}</span>
+                  <span
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${band.state === "ocupada" ? "bg-danger-soft text-danger" : "bg-ok-soft text-ok"}`}
+                  >
+                    {band.state === "ocupada" ? "Ocupada" : "Libre"}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -185,7 +189,11 @@ async function ReservationBoard({
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                       <h2 className="text-xl font-semibold tracking-tight text-navy">{reservation.sala.nombre}</h2>
-                      <p className="text-sm font-semibold text-ink">{reservation.estado}</p>
+                      <p
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${reservation.estado === RESERVATION_CONFIRMED ? "bg-ok-soft text-ok" : "bg-danger-soft text-danger"}`}
+                      >
+                        {reservation.estado}
+                      </p>
                     </div>
                     <p className="text-sm text-muted">Código: {reservation.sala.codigo}</p>
                     <p className="text-sm text-ink">Inicio: {formatWhen(reservation.inicio)}</p>

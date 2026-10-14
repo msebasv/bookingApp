@@ -174,7 +174,7 @@ test("cerrar sesión deja de autorizar la cuenta", async ({ page }) => {
   const usuario = await prisma.usuario.findUniqueOrThrow({ where: { email } });
   const sesion = await prisma.sesion.findFirstOrThrow({ where: { usuarioId: usuario.id } });
 
-  await page.getByRole("button", { name: "Cerrar sesión" }).click();
+  await page.getByRole("navigation", { name: "Principal" }).getByRole("button", { name: "Cerrar sesión" }).click();
   await expect(page.getByRole("heading", { name: "Iniciar sesión" })).toBeVisible();
   await page.goto("/cuenta");
   await expect(page.locator("p[role='alert']")).toHaveText("No autorizado.");

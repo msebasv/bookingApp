@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { Geist } from "next/font/google";
-import { AdminRoleLink } from "@/components/admin-role-link";
+import { PublicNavFallback, SessionNav } from "@/components/session-nav";
 import { SiteFooter, SiteHeader } from "@/components/shell";
 import "./globals.css";
 
@@ -20,9 +20,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={`${geistSans.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <SiteHeader
-          extra={
-            <Suspense fallback={null}>
-              <AdminRoleLink />
+          nav={
+            <Suspense fallback={<PublicNavFallback />}>
+              <SessionNav />
             </Suspense>
           }
         />

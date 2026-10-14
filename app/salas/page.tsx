@@ -39,7 +39,11 @@ async function RoomCatalog() {
                       <h2 className="text-xl font-semibold tracking-tight text-navy">{room.nombre}</h2>
                       <p className="text-sm text-muted">Código: {room.codigo}</p>
                     </div>
-                    <p className="text-sm font-semibold text-ink">{room.estado === ROOM_ACTIVE ? "Activa" : "Inactiva"}</p>
+                    <p
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${room.estado === ROOM_ACTIVE ? "bg-ok-soft text-ok" : "bg-blue-soft text-muted"}`}
+                    >
+                      {room.estado === ROOM_ACTIVE ? "Activa" : "Inactiva"}
+                    </p>
                   </div>
                   <p className="text-sm text-ink">Ubicación: {room.ubicacion}</p>
                   <p className="text-sm text-ink">Capacidad: {room.capacidad}</p>

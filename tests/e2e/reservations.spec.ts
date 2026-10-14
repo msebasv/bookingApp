@@ -366,7 +366,7 @@ test("sin sesión /reservas redirige al ingreso y cada rol ve solo sus reservas"
   await page.context().clearCookies();
   await page.goto("/reservas");
   await expect(page).toHaveURL(/\/ingreso$/);
-  await expect(page.getByRole("link", { name: "Reservas", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Reservas", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Confirmar reserva" })).toHaveCount(0);
 
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
