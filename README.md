@@ -164,6 +164,4 @@ Proyecto desarrollado para la materia Tendencias avanzadas en ingeniería de sof
 
 - <Sebastián Martínez Velandia>
 - <David Orlando González Buitrago>
-- <Kavin Santiago García>
-- <Juan Diego Castro>
 
