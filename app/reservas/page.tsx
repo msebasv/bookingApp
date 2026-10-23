@@ -25,6 +25,21 @@ const bogotaFormat = new Intl.DateTimeFormat("es-CO", {
   hourCycle: "h23",
 });
 
+const bogotaDate = new Intl.DateTimeFormat("es-CO", {
+  timeZone: BOGOTA_TIME_ZONE,
+  weekday: "long",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+const bogotaTime = new Intl.DateTimeFormat("es-CO", {
+  timeZone: BOGOTA_TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 const FILTERS = [
   { id: "proximas", label: "Próximas" },
   { id: "pasadas", label: "Pasadas" },
@@ -199,7 +214,14 @@ async function ReservationBoard({
                     <p className="text-sm text-ink">Inicio: {formatWhen(reservation.inicio)}</p>
                     <p className="text-sm text-ink">Fin: {formatWhen(reservation.fin)}</p>
                     <p className="text-sm text-ink">Correo: {reservation.usuario.email}</p>
-                    {cancellable ? <CancelReservationForm id={reservation.id} /> : null}
+                    {cancellable ? (
+                      <CancelReservationForm
+                        id={reservation.id}
+                        sala={reservation.sala.nombre}
+                        fecha={bogotaDate.format(reservation.inicio)}
+                        horario={`${bogotaTime.format(reservation.inicio)} a ${bogotaTime.format(reservation.fin)}`}
+                      />
+                    ) : null}
                   </div>
                 </article>
               </li>

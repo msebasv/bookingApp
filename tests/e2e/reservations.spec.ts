@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { expect, test, type BrowserContext, type Page, type Request } from "@playwright/test";
+import { expect, test, type BrowserContext, type Locator, type Page, type Request } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 
 const databaseUrl = process.env.BOOKINGAPP_E2E_DATABASE_URL ?? "file:./e2e.db";
@@ -134,6 +134,14 @@ async function storedDay(codigo: string, dia: number) {
 
 const DAY_LABEL = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
+const bogotaLongDate = new Intl.DateTimeFormat("es-CO", {
+  timeZone: "America/Bogota",
+  weekday: "long",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
 function bogotaParts(instant: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Bogota",
@@ -240,6 +248,17 @@ async function bookAndConfirm(page: Page, codigo: string, fecha: string, hora: s
   await book(page, codigo, fecha, hora);
   await pending;
   await expect(page.locator("#crear-reserva").getByText("Reserva confirmada.")).toBeVisible();
+}
+
+function cancelDialog(article: Locator) {
+  return article.getByRole("dialog", { name: "¿Cancelar esta reserva?" });
+}
+
+async function confirmCancel(article: Locator) {
+  await article.getByRole("button", { name: "Cancelar reserva" }).click();
+  const dialog = cancelDialog(article);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Confirmar cancelación" }).click();
 }
 
 test("un par inválido no cambia el horario guardado y vaciar el día lo borra", async ({ page }) => {
@@ -492,7 +511,7 @@ test("cancela la propia, rechaza la ajena y el administrador cancela sin volver 
   const first = (await reservationsFor(codigo))[0];
   const firstArticle = page.getByRole("article", { name: `Reserva ${first.id}` });
   const cancelRequest = page.waitForRequest((request) => request.method() === "POST" && request.url().includes("/reservas"));
-  await firstArticle.getByRole("button", { name: "Cancelar reserva" }).click();
+  await confirmCancel(firstArticle);
   const cancelSource = await cancelRequest;
   await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(firstArticle.getByText("CANCELADA", { exact: true })).toBeVisible();
@@ -532,7 +551,7 @@ test("cancela la propia, rechaza la ajena y el administrador cancela sin volver 
   await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
   await page.goto("/reservas");
   const adminArticle = page.getByRole("article", { name: `Reserva ${second.id}` });
-  await adminArticle.getByRole("button", { name: "Cancelar reserva" }).click();
+  await confirmCancel(adminArticle);
   await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(adminArticle.getByText("CANCELADA", { exact: true })).toBeVisible();
   const adminCancelled = await prisma.reserva.findUniqueOrThrow({
@@ -541,6 +560,104 @@ test("cancela la propia, rechaza la ajena y el administrador cancela sin volver 
   });
   expect(adminCancelled.estado).toBe("CANCELADA");
   expect(adminCancelled.ocupaciones).toHaveLength(0);
+});
+
+test("cancelar pide confirmación con sala, fecha y horario; volver o Escape no envían nada", async ({ page }) => {
+  const slot = upcomingMorning();
+  const codigo = uniqueCode("Q");
+  const student = uniqueEmail("confirma-est");
+  await register(page, student);
+
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto("/salas");
+  await createRoom(page, codigo);
+  await openDay(page, codigo, slot.label);
+
+  await loginAs(page, student, PASSWORD);
+  await page.goto("/reservas");
+  await bookAndConfirm(page, codigo, slot.fecha, "08:00");
+  const reserva = (await reservationsFor(codigo))[0];
+  const article = page.getByRole("article", { name: `Reserva ${reserva.id}` });
+  const cancelButton = article.getByRole("button", { name: "Cancelar reserva" });
+  const dialog = cancelDialog(article);
+  const posts: Request[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("/reservas")) {
+      posts.push(request);
+    }
+  });
+
+  await expect(dialog).toBeHidden();
+  await cancelButton.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(`Sala ${codigo}`, { exact: true })).toBeVisible();
+  await expect(dialog.getByText(bogotaLongDate.format(slot.start), { exact: true })).toBeVisible();
+  await expect(dialog.getByText("08:00 a 09:00", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Volver" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Volver" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(cancelButton).toBeFocused();
+
+  await page.keyboard.press("Enter");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Volver" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(dialog.getByRole("button", { name: "Confirmar cancelación" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(cancelButton).toBeFocused();
+
+  await page.setViewportSize({ width: 360, height: 640 });
+  await cancelButton.click();
+  await expect(dialog).toBeVisible();
+  const box = await dialog.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((box?.x ?? 0) + (box?.width ?? Infinity)).toBeLessThanOrEqual(360);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+
+  expect(posts).toHaveLength(0);
+  const kept = await prisma.reserva.findUniqueOrThrow({ where: { id: reserva.id }, include: { ocupaciones: true } });
+  expect(kept.estado).toBe("CONFIRMADA");
+  expect(kept.ocupaciones).toHaveLength(2);
+
+  const cancelResponse = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().includes("/reservas"),
+  );
+  await confirmCancel(article);
+  await cancelResponse;
+  await expect(article).toHaveCount(0);
+  expect(posts).toHaveLength(1);
+  const cancelled = await prisma.reserva.findUniqueOrThrow({ where: { id: reserva.id }, include: { ocupaciones: true } });
+  expect(cancelled.estado).toBe("CANCELADA");
+  expect(cancelled.ocupaciones).toHaveLength(0);
+});
+
+test("si el servidor rechaza la cancelación confirmada se ve el error y no el aviso de éxito", async ({ page }) => {
+  const slot = upcomingMorning();
+  const codigo = uniqueCode("R");
+  await loginAs(page, ADMIN_EMAIL, ADMIN_PASSWORD);
+  await page.goto("/salas");
+  await createRoom(page, codigo);
+  await openDay(page, codigo, slot.label);
+
+  await page.goto("/reservas");
+  await bookAndConfirm(page, codigo, slot.fecha, "08:00");
+  const reserva = (await reservationsFor(codigo))[0];
+  const article = page.getByRole("article", { name: `Reserva ${reserva.id}` });
+  await article.getByRole("button", { name: "Cancelar reserva" }).click();
+  await expect(cancelDialog(article)).toBeVisible();
+
+  // Otra sesión la cancela mientras el diálogo sigue abierto.
+  await prisma.$transaction([
+    prisma.reservaOcupacion.deleteMany({ where: { reservaId: reserva.id } }),
+    prisma.reserva.update({ where: { id: reserva.id }, data: { estado: "CANCELADA" } }),
+  ]);
+  await cancelDialog(article).getByRole("button", { name: "Confirmar cancelación" }).click();
+  await expect(article.getByRole("alert")).toHaveText("La reserva ya está cancelada.");
+  await expect(cancelDialog(article)).toBeHidden();
+  await expect(article.getByText("Reserva cancelada.", { exact: true })).toHaveCount(0);
 });
 
 test("dos salas confirman el mismo intervalo", async ({ page }) => {
@@ -600,7 +717,7 @@ test("cancelar y crear otra en el mismo intervalo deja dos registros distintos",
   await page.goto("/reservas");
   await bookAndConfirm(page, codigo, slot.fecha, "08:00");
   const original = (await reservationsFor(codigo))[0];
-  await page.getByRole("article", { name: `Reserva ${original.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
+  await confirmCancel(page.getByRole("article", { name: `Reserva ${original.id}` }));
   await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(page.getByRole("article", { name: `Reserva ${original.id}` }).getByText("CANCELADA", { exact: true })).toBeVisible();
 
@@ -918,7 +1035,7 @@ test("una reserva vigente impide desactivar y el historial se conserva", async (
   await page.goto("/reservas");
   await bookAndConfirm(page, cancelled, slot.fecha, "08:00");
   const cancelledRow = (await reservationsFor(cancelled))[0];
-  await page.getByRole("article", { name: `Reserva ${cancelledRow.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
+  await confirmCancel(page.getByRole("article", { name: `Reserva ${cancelledRow.id}` }));
   await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(page.getByRole("article", { name: `Reserva ${cancelledRow.id}` }).getByText("CANCELADA", { exact: true })).toBeVisible();
 
@@ -983,7 +1100,7 @@ test("un estudiante que afirma ser administrador no cambia horarios, no cancela 
     throw new Error("Faltan las dos reservas del administrador.");
   }
   const cancelPromise = page.waitForRequest((request) => request.method() === "POST" && request.url().includes("/reservas"));
-  await page.getByRole("article", { name: `Reserva ${sacrificed.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
+  await confirmCancel(page.getByRole("article", { name: `Reserva ${sacrificed.id}` }));
   const cancelSource = await cancelPromise;
   await page.getByRole("link", { name: "Canceladas", exact: true }).click();
   await expect(page.getByRole("article", { name: `Reserva ${sacrificed.id}` }).getByText("CANCELADA", { exact: true })).toBeVisible();
@@ -1071,7 +1188,7 @@ test("cancelar en el instante de inicio conserva la reserva y sus ocupaciones", 
   await bookAndConfirm(page, codigo, slot.fecha, "08:00");
   const future = (await reservationsFor(codigo))[0];
   const cancelPromise = page.waitForRequest((request) => request.method() === "POST" && request.url().includes("/reservas"));
-  await page.getByRole("article", { name: `Reserva ${future.id}` }).getByRole("button", { name: "Cancelar reserva" }).click();
+  await confirmCancel(page.getByRole("article", { name: `Reserva ${future.id}` }));
   const cancelSource = await cancelPromise;
 
   const inicio = new Date();

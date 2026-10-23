@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { useActionState } from "react";
 import { minuteLabel, MSG_DAY_CLOSED, MSG_NO_COMPATIBLE_START, MSG_PICK_DATE, MSG_WEEKEND_NOTE, startOffer } from "@/lib/reservations/consultation";
 import { cancelReservation, createReservation } from "@/lib/reservations/actions";
@@ -225,20 +225,80 @@ export function CreateReservationForm({
   );
 }
 
-export function CancelReservationForm({ id }: { id: string }) {
+export function CancelReservationForm({
+  id,
+  sala,
+  fecha,
+  horario,
+}: {
+  id: string;
+  sala: string;
+  fecha: string;
+  horario: string;
+}) {
   const [state, formAction, pending] = useActionState(cancelReservation, null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = `cancelar-${id}-titulo`;
+  const detailsId = `cancelar-${id}-detalle`;
+
+  // Next.js oculta la página con <Activity> al navegar; cerrar el diálogo evita que la página quede inerte al volver.
+  useLayoutEffect(() => {
+    const dialog = dialogRef.current;
+    return () => dialog?.close();
+  }, []);
+
   return (
-    <form action={formAction} className="flex flex-col gap-3">
+    <form action={formAction} onSubmit={() => dialogRef.current?.close()} className="flex flex-col gap-3">
       <input type="hidden" name="id" value={id} />
       <Alert error={state?.error ?? ""} />
       <Notice notice={state?.notice ?? ""} />
       <button
         className="inline-flex h-11 items-center justify-center rounded-md border border-line bg-white px-4 text-sm font-semibold text-navy transition-colors hover:bg-blue-soft disabled:cursor-not-allowed disabled:opacity-60"
-        type="submit"
+        type="button"
         disabled={pending}
+        onClick={() => dialogRef.current?.showModal()}
       >
         Cancelar reserva
       </button>
+      <dialog
+        ref={dialogRef}
+        aria-labelledby={titleId}
+        aria-describedby={detailsId}
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-line bg-white p-5 text-ink shadow-lg backdrop:bg-navy/40 sm:p-6"
+      >
+        <div className="flex flex-col gap-4">
+          <h2 id={titleId} className="text-lg font-semibold tracking-tight text-navy">
+            ¿Cancelar esta reserva?
+          </h2>
+          <div id={detailsId} className="flex flex-col gap-3">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md border border-line bg-canvas px-3 py-2 text-sm">
+              <dt className="text-muted">Sala</dt>
+              <dd className="font-semibold text-ink">{sala}</dd>
+              <dt className="text-muted">Fecha</dt>
+              <dd className="text-ink">{fecha}</dd>
+              <dt className="text-muted">Horario</dt>
+              <dd className="text-ink">{horario}</dd>
+            </dl>
+            <p className="text-sm text-muted">El espacio quedará libre para otras personas y la cancelación no se puede deshacer.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              className="inline-flex h-11 items-center justify-center rounded-md border border-line bg-white px-4 text-sm font-semibold text-navy transition-colors hover:bg-blue-soft"
+              type="button"
+              onClick={() => dialogRef.current?.close()}
+            >
+              Volver
+            </button>
+            <button
+              className="inline-flex h-11 items-center justify-center rounded-md bg-navy px-4 text-sm font-semibold text-white transition-colors hover:bg-blue disabled:cursor-not-allowed disabled:opacity-60"
+              type="submit"
+              disabled={pending}
+            >
+              Confirmar cancelación
+            </button>
+          </div>
+        </div>
+      </dialog>
     </form>
   );
 }
